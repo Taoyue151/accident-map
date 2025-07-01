@@ -1,0 +1,80 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title>事故地图</title>
+    <style>
+        html, body { height: 100%; margin: 0; padding: 0; }
+        #map { height: 100%; width: 100%; }
+        .filter-box {
+            position: absolute;
+            top: 10px; left: 10px;
+            background: white; padding: 10px;
+            z-index: 999;
+            max-height: 90%; overflow-y: auto;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.2);
+        }
+        .filter-box input {
+            width: 200px; margin-bottom: 5px;
+        }
+    </style>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+</head>
+<body>
+<div class="filter-box">
+    <div><b>关键词筛选（支持组合过滤）：</b></div>
+    <input id="summary" placeholder="事故概要"><br>
+    <input id="date" placeholder="事故时间"><br>
+    <input id="type" placeholder="事故类型"><br>
+    <input id="level" placeholder="事故等级"><br>
+    <input id="loss" placeholder="事故损失情况"><br>
+    <input id="ship_info" placeholder="涉事船舶及其归属情况"><br>
+    <input id="related_to_zhejiang" placeholder="是否涉及浙江运输"><br>
+    <input id="jia_guang_rent" placeholder="挂而未管或假光租"><br>
+    <input id="dai_bu_guan" placeholder="代而不管"><br>
+    <input id="partial_control" placeholder="挂且部分管"><br>
+    <input id="no_certificate" placeholder="三无船舶"><br>
+    <button onclick="applyFilter()">筛选</button>
+</div>
+<div id="map"></div>
+<script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+<script>
+    let map = L.map('map').setView([30.3, 120.2], 6);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap'
+    }).addTo(map);
+    let allMarkers = [];
+
+    fetch('data.json').then(res => res.json()).then(data => {
+        window.allData = data;
+        renderMarkers(data);
+    });
+
+    function renderMarkers(data) {
+        allMarkers.forEach(m => map.removeLayer(m));
+        allMarkers = [];
+        data.forEach(row => {
+            let content = Object.entries(row).map(([k,v]) => `<b>${k}</b>：${v}`).join("<br>");
+            let marker = L.marker([row.lat, row.lng]).addTo(map).bindPopup(content);
+            allMarkers.push(marker);
+        });
+    }
+
+    function applyFilter() {
+        let filters = {};
+        document.querySelectorAll("input").forEach(input => {
+            if (input.value.trim()) {
+                filters[input.id] = input.value.trim();
+            }
+        });
+        let filtered = window.allData.filter(row =>
+            Object.entries(filters).every(([k,v]) =>
+                String(row[k] || '').includes(v))
+        );
+        renderMarkers(filtered);
+    }
+</script>
+</body>
+</html>

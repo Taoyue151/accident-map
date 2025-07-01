@@ -1,80 +1,101 @@
 
 <!DOCTYPE html>
-<html>
+<html lang="zh">
 <head>
-    <meta charset="utf-8" />
-    <title>事故地图</title>
-    <style>
-        html, body { height: 100%; margin: 0; padding: 0; }
-        #map { height: 100%; width: 100%; }
-        .filter-box {
-            position: absolute;
-            top: 10px; left: 10px;
-            background: white; padding: 10px;
-            z-index: 999;
-            max-height: 90%; overflow-y: auto;
-            border-radius: 8px;
-            box-shadow: 0 0 10px rgba(0,0,0,0.2);
-        }
-        .filter-box input {
-            width: 200px; margin-bottom: 5px;
-        }
-    </style>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+  <meta charset="UTF-8">
+  <title>事故地图展示</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css" />
+  <style>
+    body { margin: 0; padding: 0; }
+    #map { height: 100vh; width: 100vw; }
+    .filter-box {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      background: white;
+      padding: 10px;
+      z-index: 1000;
+      border-radius: 5px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.3);
+      font-size: 14px;
+    }
+    .filter-box input {
+      width: 250px;
+      margin-bottom: 5px;
+    }
+  </style>
 </head>
 <body>
 <div class="filter-box">
-    <div><b>关键词筛选（支持组合过滤）：</b></div>
-    <input id="summary" placeholder="事故概要"><br>
-    <input id="date" placeholder="事故时间"><br>
-    <input id="type" placeholder="事故类型"><br>
-    <input id="level" placeholder="事故等级"><br>
-    <input id="loss" placeholder="事故损失情况"><br>
-    <input id="ship_info" placeholder="涉事船舶及其归属情况"><br>
-    <input id="related_to_zhejiang" placeholder="是否涉及浙江运输"><br>
-    <input id="jia_guang_rent" placeholder="挂而未管或假光租"><br>
-    <input id="dai_bu_guan" placeholder="代而不管"><br>
-    <input id="partial_control" placeholder="挂且部分管"><br>
-    <input id="no_certificate" placeholder="三无船舶"><br>
-    <button onclick="applyFilter()">筛选</button>
+  <strong>关键词筛选（支持组合过滤）：</strong><br>
+  <input id="summary" placeholder="事故概要"><br>
+  <input id="date" placeholder="事故时间"><br>
+  <input id="type" placeholder="事故类型"><br>
+  <input id="level" placeholder="事故等级"><br>
+  <input id="loss" placeholder="事故损失情况"><br>
+  <input id="vessels" placeholder="涉事船舶及其归属情况"><br>
+  <input id="related_to_zhejiang" placeholder="是否涉及浙江运输"><br>
+  <input id="nominal_only" placeholder="挂而未管或假光租"><br>
+  <input id="proxy_only" placeholder="代而不管"><br>
+  <input id="partial_control" placeholder="挂且部分管"><br>
+  <input id="illegal" placeholder="三无船舶"><br>
+  <button onclick="applyFilter()">筛选</button>
 </div>
 <div id="map"></div>
-<script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"></script>
 <script>
-    let map = L.map('map').setView([30.3, 120.2], 6);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; OpenStreetMap'
-    }).addTo(map);
-    let allMarkers = [];
+  let map = L.map('map').setView([30, 120], 5);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: 'Leaflet | © OpenStreetMap',
+  }).addTo(map);
 
-    fetch('data.json').then(res => res.json()).then(data => {
-        window.allData = data;
-        renderMarkers(data);
+  let markers = [];
+
+  async function loadData() {
+    const response = await fetch('data.json');
+    const data = await response.json();
+    return data;
+  }
+
+  function clearMarkers() {
+    markers.forEach(m => map.removeLayer(m));
+    markers = [];
+  }
+
+  function applyFilter() {
+    clearMarkers();
+    loadData().then(data => {
+      const filters = {
+        summary: document.getElementById('summary').value,
+        date: document.getElementById('date').value,
+        type: document.getElementById('type').value,
+        level: document.getElementById('level').value,
+        loss: document.getElementById('loss').value,
+        vessels: document.getElementById('vessels').value,
+        related_to_zhejiang: document.getElementById('related_to_zhejiang').value,
+        nominal_only: document.getElementById('nominal_only').value,
+        proxy_only: document.getElementById('proxy_only').value,
+        partial_control: document.getElementById('partial_control').value,
+        illegal: document.getElementById('illegal').value
+      };
+
+      const filtered = data.filter(item =>
+        Object.keys(filters).every(key =>
+          item[key].toString().includes(filters[key])
+        )
+      );
+
+      filtered.forEach(item => {
+        const marker = L.marker([item.lat, item.lon])
+          .addTo(map)
+          .bindPopup(`<b>${item.date}</b><br>${item.summary}<br>${item.type}<br>${item.vessels}`);
+        markers.push(marker);
+      });
     });
+  }
 
-    function renderMarkers(data) {
-        allMarkers.forEach(m => map.removeLayer(m));
-        allMarkers = [];
-        data.forEach(row => {
-            let content = Object.entries(row).map(([k,v]) => `<b>${k}</b>：${v}`).join("<br>");
-            let marker = L.marker([row.lat, row.lng]).addTo(map).bindPopup(content);
-            allMarkers.push(marker);
-        });
-    }
-
-    function applyFilter() {
-        let filters = {};
-        document.querySelectorAll("input").forEach(input => {
-            if (input.value.trim()) {
-                filters[input.id] = input.value.trim();
-            }
-        });
-        let filtered = window.allData.filter(row =>
-            Object.entries(filters).every(([k,v]) =>
-                String(row[k] || '').includes(v))
-        );
-        renderMarkers(filtered);
-    }
+  applyFilter();
 </script>
 </body>
 </html>

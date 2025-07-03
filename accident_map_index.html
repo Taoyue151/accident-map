@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>事故地图</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster/dist/MarkerCluster.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster/dist/MarkerCluster.Default.css" />
+  <style>
+    #map { height: 100vh; }
+    .filter-panel {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      background: white;
+      padding: 10px;
+      z-index: 1000;
+      max-width: 300px;
+      font-size: 14px;
+    }
+    .filter-panel input, .filter-panel select {
+      width: 100%;
+      margin-bottom: 5px;
+    }
+  </style>
+</head>
+<body>
+  <div class="filter-panel">
+    <input type="text" id="keyword" placeholder="输入关键词后点击确认" />
+    <select id="filterField">
+      <option value="事故概要">事故概要</option>
+      <option value="事故时间">事故时间</option>
+      <option value="事故类型">事故类型</option>
+      <option value="事故等级">事故等级</option>
+      <option value="事故损失">事故损失</option>
+      <option value="涉事船舶及其归属情况">涉事船舶及其归属情况</option>
+      <option value="是否涉及浙江航运企业或海上货物运输的个人">是否涉及浙江航运企业或海上货物运输的个人</option>
+    </select>
+    <select id="挂而未管或假光租">
+      <option value="">挂而未管或假光租（全部）</option>
+      <option value="Y">Y</option>
+      <option value="空">空白</option>
+    </select>
+    <select id="代而不管">
+      <option value="">代而不管（全部）</option>
+      <option value="Y">Y</option>
+      <option value="空">空白</option>
+    </select>
+    <select id="挂且有效或部分管理">
+      <option value="">挂且有效或部分管理（全部）</option>
+      <option value="Y">Y</option>
+      <option value="空">空白</option>
+    </select>
+    <select id="三无运输船舶">
+      <option value="">三无运输船舶（全部）</option>
+      <option value="Y">Y</option>
+      <option value="空">空白</option>
+    </select>
+    <button onclick="applyFilters()">确认</button>
+  </div>
+  <div id="map"></div>
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet.markercluster/dist/leaflet.markercluster.js"></script>
+  <script>
+    let map = L.map('map').setView([29.5, 119.5], 6);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 18,
+    }).addTo(map);
+
+    let markers = L.markerClusterGroup();
+    let allPoints = [];
+
+    fetch('map_points.json')
+      .then(response => response.json())
+      .then(data => {
+        allPoints = data;
+        renderPoints(allPoints);
+      });
+
+    function renderPoints(data) {
+      markers.clearLayers();
+      data.forEach(point => {
+        if (!point.lat || !point.lng) return;
+        let marker = L.marker([point.lat, point.lng]);
+        marker.bindPopup(`
+          <b>事故时间：</b>${point.事故时间}<br>
+          <b>事故类型：</b>${point.事故类型}<br>
+          <b>事故等级：</b>${point.事故等级}<br>
+          <b>事故损失：</b>${point.事故损失}<br>
+          <b>概要：</b>${point.事故概要}<br>
+          <b>船舶归属：</b>${point.涉事船舶及其归属情况}<br>
+        `);
+        markers.addLayer(marker);
+      });
+      map.addLayer(markers);
+    }
+
+    function applyFilters() {
+      const keyword = document.getElementById('keyword').value.trim();
+      const field = document.getElementById('filterField').value;
+
+      const f1 = document.getElementById('挂而未管或假光租').value;
+      const f2 = document.getElementById('代而不管').value;
+      const f3 = document.getElementById('挂且有效或部分管理').value;
+      const f4 = document.getElementById('三无运输船舶').value;
+
+      const filtered = allPoints.filter(p => {
+        const textMatch = keyword === '' || (p[field] && p[field].includes(keyword));
+        const v = val => (val === '空' ? '' : val);
+        const c1 = f1 === '' || p['挂而未管或假光租'] === v(f1);
+        const c2 = f2 === '' || p['代而不管'] === v(f2);
+        const c3 = f3 === '' || p['挂且有效或部分管理'] === v(f3);
+        const c4 = f4 === '' || p['三无运输船舶'] === v(f4);
+        return textMatch && c1 && c2 && c3 && c4;
+      });
+      renderPoints(filtered);
+    }
+  </script>
+</body>
+</html>

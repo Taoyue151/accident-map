@@ -1,0 +1,157 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>事故点位地图</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.Default.css" />
+  <style>
+    html, body, #map {{
+      height: 100%;
+      margin: 0;
+    }}
+    .watermark {{
+      position: absolute;
+      opacity: 0.08;
+      font-size: 24px;
+      font-weight: bold;
+      color: #000;
+      pointer-events: none;
+      z-index: 999;
+    }}
+    .bottom-left {{
+      bottom: 20px;
+      left: 20px;
+    }}
+    .bottom-right {{
+      bottom: 20px;
+      right: 20px;
+    }}
+    .filter-box {{
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      z-index: 1000;
+      background: rgba(255, 255, 255, 0.95);
+      padding: 10px;
+      border-radius: 8px;
+      max-width: 300px;
+    }}
+    .filter-box input, .filter-box select {{
+      width: 100%;
+      margin-bottom: 5px;
+    }}
+  </style>
+</head>
+<body>
+  <div class="filter-box">
+    <input id="search_description" type="text" placeholder="事故概要" />
+    <input id="search_time" type="text" placeholder="事故时间" />
+    <input id="search_loss" type="text" placeholder="事故损失" />
+    <input id="search_ship" type="text" placeholder="涉事船舶及其归属情况" />
+    <select id="select_type"><option value="">事故类型</option></select>
+    <select id="select_level"><option value="">事故等级</option></select>
+    <select id="select_zhejiang"><option value="">是否涉及浙江</option></select>
+    <select id="select_unmanaged"><option value="">挂而未管或假光租</option></select>
+    <select id="select_proxy"><option value="">代而不管</option></select>
+    <select id="select_managed"><option value="">挂且有效或部分管理</option></select>
+    <select id="select_sanwu"><option value="">三无运输船舶</option></select>
+    <button onclick="applyFilters()">确认</button>
+  </div>
+
+  <div id="map"></div>
+
+  <div class="watermark" style="top: 10%; left: 20%;">浙江省港航管理中心</div>
+  <div class="watermark" style="top: 30%; left: 50%;">浙江省港航管理中心</div>
+  <div class="watermark" style="top: 60%; left: 30%;">浙江省港航管理中心</div>
+  <div class="watermark" style="top: 80%; left: 60%;">浙江省港航管理中心</div>
+  <div class="watermark bottom-left">陶越 CCSC 15168318167</div>
+  <div class="watermark bottom-right">陶越 CCSC 15168318167</div>
+
+  <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet.markercluster@1.4.1/dist/leaflet.markercluster.js"></script>
+  <script>
+    let map = L.map('map').setView([29.5, 121.5], 6);
+    L.tileLayer('https://{{s}}.tile.openstreetmap.org/{{z}}/{{x}}/{{y}}.png', {{
+      maxZoom: 18
+    }}).addTo(map);
+
+    let markerCluster = L.markerClusterGroup();
+    let allMarkers = [];
+
+    fetch('points_804.json')
+      .then(response => response.json())
+      .then(data => {{
+        const unique = (key) => [...new Set(data.map(item => item[key]).filter(Boolean))];
+        const addOptions = (id, values) => {{
+          const sel = document.getElementById(id);
+          values.forEach(val => {{
+            let opt = document.createElement("option");
+            opt.value = val;
+            opt.innerText = val;
+            sel.appendChild(opt);
+          }});
+        }};
+        addOptions("select_type", unique("type"));
+        addOptions("select_level", unique("level"));
+        addOptions("select_zhejiang", unique("zhejiang_related"));
+        addOptions("select_unmanaged", unique("unmanaged_fake"));
+        addOptions("select_proxy", unique("proxy_only"));
+        addOptions("select_managed", unique("managed_partial"));
+        addOptions("select_sanwu", unique("sanwu"));
+
+        data.forEach(item => {{
+          let marker = L.marker([item.lat, item.lng]);
+          marker.bindPopup(
+            `<b>事故时间:</b> ${item.time}<br>
+             <b>事故类型:</b> ${item.type}<br>
+             <b>事故等级:</b> ${item.level}<br>
+             <b>损失:</b> ${item.loss}<br>
+             <b>船舶:</b> ${item.ship}<br>
+             <b>浙江相关:</b> ${item.zhejiang_related}<br>
+             <b>概要:</b> ${item.description}`
+          );
+          marker.options.meta = item;
+          allMarkers.push(marker);
+          markerCluster.addLayer(marker);
+        }});
+        map.addLayer(markerCluster);
+      }});
+
+    function applyFilters() {{
+      let desc = document.getElementById("search_description").value;
+      let time = document.getElementById("search_time").value;
+      let loss = document.getElementById("search_loss").value;
+      let ship = document.getElementById("search_ship").value;
+      let filters = {{
+        type: document.getElementById("select_type").value,
+        level: document.getElementById("select_level").value,
+        zhejiang_related: document.getElementById("select_zhejiang").value,
+        unmanaged_fake: document.getElementById("select_unmanaged").value,
+        proxy_only: document.getElementById("select_proxy").value,
+        managed_partial: document.getElementById("select_managed").value,
+        sanwu: document.getElementById("select_sanwu").value
+      }};
+
+      markerCluster.clearLayers();
+      let filtered = allMarkers.filter(m => {{
+        let d = m.options.meta;
+        return (!desc || d.description.includes(desc)) &&
+               (!time || d.time.includes(time)) &&
+               (!loss || d.loss.includes(loss)) &&
+               (!ship || d.ship.includes(ship)) &&
+               (!filters.type || d.type === filters.type) &&
+               (!filters.level || d.level === filters.level) &&
+               (!filters.zhejiang_related || d.zhejiang_related === filters.zhejiang_related) &&
+               (!filters.unmanaged_fake || d.unmanaged_fake === filters.unmanaged_fake) &&
+               (!filters.proxy_only || d.proxy_only === filters.proxy_only) &&
+               (!filters.managed_partial || d.managed_partial === filters.managed_partial) &&
+               (!filters.sanwu || d.sanwu === filters.sanwu);
+      }});
+      filtered.forEach(m => markerCluster.addLayer(m));
+    }}
+  </script>
+</body>
+</html>

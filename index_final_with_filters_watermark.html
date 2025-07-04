@@ -1,0 +1,159 @@
+
+<!DOCTYPE html>
+
+<html>
+<head>
+<meta charset="utf-8"/>
+<title>事故地图</title>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<link href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" rel="stylesheet"/>
+<link href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" rel="stylesheet"/>
+<link href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" rel="stylesheet"/>
+<style>
+        body { margin: 0; padding: 0; }
+        #map { position: absolute; top: 0; bottom: 0; right: 0; left: 0; }
+        .watermark {
+            position: absolute;
+            font-size: 36px;
+            color: rgba(100, 100, 100, 0.2);
+            transform: rotate(-30deg);
+            z-index: 999;
+            pointer-events: none;
+        }
+        .cluster-custom {
+            background-color: rgba(255, 140, 0, 0.6);
+            border-radius: 20px;
+            color: white;
+            font-size: 14px;
+            font-weight: bold;
+            padding: 4px 10px;
+            border: 2px solid #fff;
+            text-align: center;
+        }
+    </style>
+<style>
+body::before {
+    content: "浙江省港航管理中心";
+    color: rgba(150,150,150,0.2);
+    font-size: 48px;
+    position: fixed;
+    top: 20%;
+    left: 20%;
+    transform: rotate(-30deg);
+    z-index: 0;
+}
+body::after {
+    content: "浙江省港航管理中心";
+    color: rgba(150,150,150,0.2);
+    font-size: 48px;
+    position: fixed;
+    top: 70%;
+    left: 70%;
+    transform: rotate(-30deg);
+    z-index: 0;
+}
+#watermark1, #watermark2, #watermark3, #watermark4, #watermark5 {
+    position: fixed;
+    color: rgba(150,150,150,0.2);
+    font-size: 48px;
+    transform: rotate(-30deg);
+    z-index: 0;
+}
+#watermark1 { top: 10%; left: 40%; }
+#watermark2 { top: 30%; left: 80%; }
+#watermark3 { top: 60%; left: 30%; }
+#watermark4 { top: 70%; left: 70%; }
+#watermark5 { top: 85%; left: 50%; }
+
+#bottom-left, #bottom-right {
+    position: fixed;
+    color: rgba(0, 0, 0, 0.5);
+    font-size: 18px;
+    z-index: 1000;
+}
+#bottom-left { bottom: 10px; left: 10px; }
+#bottom-right { bottom: 10px; right: 10px; }
+</style></head>
+<body><div id="control-box" style="position: absolute; top: 10px; left: 10px; z-index: 1000; background-color: white; padding: 10px; border-radius: 5px; box-shadow: 0 0 5px gray; overflow-x: auto; max-height: 90vh;">
+<div>
+<input id="keyword" placeholder="关键词（概要/时间/损失/船舶）" type="text"/>
+<button onclick="filterMarkers()">确认</button>
+</div>
+<div>
+<label>事故类型:</label>
+<select id="typeFilter">
+<option>全部</option><option>碰撞</option><option>火灾</option><option>搁浅</option><option>自沉</option>
+</select><br/>
+<label>事故等级:</label>
+<select id="levelFilter">
+<option>全部</option><option>特别重大</option><option>重大</option><option>较大</option><option>一般</option>
+</select><br/>
+<label>是否浙江:</label>
+<select id="zhejiangFilter">
+<option>全部</option><option>是</option><option>否</option>
+</select><br/>
+<label>挂而未管:</label>
+<select id="unmanagedFilter">
+<option>全部</option><option>是</option><option>否</option>
+</select><br/>
+<label>代而不管:</label>
+<select id="proxyFilter">
+<option>全部</option><option>是</option><option>否</option>
+</select><br/>
+<label>挂有效/部分管理:</label>
+<select id="partialFilter">
+<option>全部</option><option>是</option><option>否</option>
+</select><br/>
+<label>三无船舶:</label>
+<select id="threeNoFilter">
+<option>全部</option><option>是</option><option>否</option>
+</select><br/>
+</div>
+</div>
+<div id="map"></div>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+<script>
+    const map = L.map('map').setView([30, 120], 5);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: 'Leaflet | Data by <a href="https://openstreetmap.org">OpenStreetMap</a>, under ODbL.'
+    }).addTo(map);
+
+    const watermarkText = "浙江省港航管理中心";
+    const watermarkCount = 5;
+    for (let i = 0; i < watermarkCount; i++) {
+        const div = document.createElement("div");
+        div.className = "watermark";
+        div.style.top = `${20 + i * 20}%`;
+        div.style.left = `${10 + i * 10}%`;
+        div.innerText = watermarkText;
+        document.body.appendChild(div);
+    }
+
+    const clusterGroup = L.markerClusterGroup({
+        iconCreateFunction: function(cluster) {
+            const count = cluster.getChildCount();
+            return L.divIcon({
+                html: `<div class="cluster-custom">${count}</div>`,
+                className: 'cluster-icon',
+                iconSize: [40, 40]
+            });
+        }
+    });
+
+    fetch('points.json')
+        .then(response => response.json())
+        .then(data => {
+            data.forEach(pt => {
+                if (pt.lat && pt.lon) {
+                    const marker = L.marker([pt.lat, pt.lon]);
+                    marker.bindPopup(`<b>${pt.事故时间 || ''}</b><br>${pt.事故概要 || ''}`);
+                    clusterGroup.addLayer(marker);
+                }
+            });
+            map.addLayer(clusterGroup);
+        });
+</script>
+<div id="watermark1">浙江省港航管理中心</div><div id="watermark2">浙江省港航管理中心</div><div id="watermark3">浙江省港航管理中心</div><div id="watermark4">浙江省港航管理中心</div><div id="watermark5">浙江省港航管理中心</div><div id="bottom-left">陶越 CCSC 15168318167</div><div id="bottom-right">陶越 CCSC 15168318167</div></body>
+</html>

@@ -1,0 +1,162 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>事故点位地图</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    html, body, #map {{
+      height: 100%;
+      margin: 0;
+      padding: 0;
+    }}
+    .watermark {{
+      position: absolute;
+      color: rgba(0, 0, 0, 0.15);
+      font-size: 36px;
+      transform: rotate(-30deg);
+      z-index: 9999;
+      pointer-events: none;
+    }}
+    .search-box {{
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      z-index: 1000;
+      background: white;
+      padding: 10px;
+      border-radius: 8px;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+      font-size: 14px;
+    }}
+  </style>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+</head>
+<body>
+<div id="map"></div>
+<div class="search-box">
+  <input id="keyword" type="text" placeholder="关键词（概要/时间/损失/船）" />
+  <button onclick="applyFilters()">确认</button><br>
+  <label>事故类型:</label>
+  <select id="typeFilter">
+    <option value="全部">全部</option>
+    <option value="碰撞">碰撞</option>
+    <option value="火灾">火灾</option>
+    <option value="沉没">沉没</option>
+    <option value="搁浅">搁浅</option>
+    <option value="其他">其他</option>
+  </select><br>
+  <label>事故等级:</label>
+  <select id="levelFilter">
+    <option value="全部">全部</option>
+    <option value="特别重大">特别重大</option>
+    <option value="重大">重大</option>
+    <option value="较大">较大</option>
+    <option value="一般">一般</option>
+  </select><br>
+  <label>是否浙江:</label>
+  <select id="zhejiangFilter">
+    <option value="全部">全部</option>
+    <option value="Y">是</option>
+    <option value="N">否</option>
+  </select><br>
+  <label>挂而未管:</label>
+  <select id="hangguanFilter">
+    <option value="全部">全部</option>
+    <option value="Y">是</option>
+    <option value="N">否</option>
+  </select><br>
+  <label>代而不管:</label>
+  <select id="daiguanFilter">
+    <option value="全部">全部</option>
+    <option value="Y">是</option>
+    <option value="N">否</option>
+  </select><br>
+  <label>挂有效/部分管理:</label>
+  <select id="guayouxiaoFilter">
+    <option value="全部">全部</option>
+    <option value="Y">是</option>
+    <option value="N">否</option>
+  </select><br>
+  <label>三无船舶:</label>
+  <select id="sanwuFilter">
+    <option value="全部">全部</option>
+    <option value="Y">是</option>
+    <option value="N">否</option>
+  </select>
+</div>
+
+<script>
+  const map = L.map('map').setView([28, 121], 5);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {{
+    maxZoom: 18,
+  }}).addTo(map);
+
+  const watermarkText = "浙江省港航管理中心";
+  for (let i = 0; i < 5; i++) {{
+    const watermark = document.createElement("div");
+    watermark.className = "watermark";
+    watermark.innerText = watermarkText;
+    watermark.style.top = `${20 + i * 20}%`;
+    watermark.style.left = `${20 + i * 20}%`;
+    document.body.appendChild(watermark);
+  }}
+  const bottomRightWatermark = document.createElement("div");
+  bottomRightWatermark.className = "watermark";
+  bottomRightWatermark.innerText = "陶越 CCSC 15168318167";
+  bottomRightWatermark.style.bottom = "10px";
+  bottomRightWatermark.style.right = "10px";
+  bottomRightWatermark.style.fontSize = "18px";
+  bottomRightWatermark.style.transform = "none";
+  document.body.appendChild(bottomRightWatermark);
+
+  let markers = [];
+
+  async function loadData() {{
+    const response = await fetch("points.json");
+    const data = await response.json();
+    return data.features;
+  }}
+
+  function applyFilters() {{
+    const keyword = document.getElementById("keyword").value;
+    const type = document.getElementById("typeFilter").value;
+    const level = document.getElementById("levelFilter").value;
+    const zj = document.getElementById("zhejiangFilter").value;
+    const hg = document.getElementById("hangguanFilter").value;
+    const dg = document.getElementById("daiguanFilter").value;
+    const gy = document.getElementById("guayouxiaoFilter").value;
+    const sw = document.getElementById("sanwuFilter").value;
+
+    markers.forEach(m => map.removeLayer(m));
+    markers = [];
+
+    loadData().then(features => {{
+      features.forEach(feature => {{
+        const p = feature.properties;
+        const propsStr = JSON.stringify(p);
+        if (
+          (type === "全部" || p["事故类型"] === type) &&
+          (level === "全部" || p["事故等级"] === level) &&
+          (zj === "全部" || p["是否涉及浙江企业或运输个人"] === zj) &&
+          (hg === "全部" || p["挂而未管"] === hg) &&
+          (dg === "全部" || p["代而不管"] === dg) &&
+          (gy === "全部" || p["挂有效/部分管理"] === gy) &&
+          (sw === "全部" || p["三无船舶"] === sw) &&
+          (keyword === "" || propsStr.includes(keyword))
+        ) {{
+          const [lng, lat] = feature.geometry.coordinates;
+          const marker = L.marker([lat, lng]).addTo(map);
+          marker.bindPopup(Object.entries(p).map(([k,v]) => `<b>${{k}}:</b> ${{v}}`).join("<br>"));
+          markers.push(marker);
+        }}
+      }});
+    }});
+  }}
+
+  applyFilters(); // 初始化加载
+</script>
+</body>
+</html>

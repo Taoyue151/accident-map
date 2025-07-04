@@ -1,71 +1,177 @@
 
 <!DOCTYPE html>
-<html>
+<html lang="zh">
 <head>
-    <meta charset="utf-8" />
-    <title>事故点位地图</title>
+    <meta charset="UTF-8" />
+    <title>事故地图</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
-        html, body, #map { height: 100%; margin: 0; padding: 0; }
-
-        .watermark {
+        html, body, #map {{
+            height: 100%;
+            margin: 0;
+        }}
+        .watermark {{
             position: absolute;
-            color: rgba(0, 0, 0, 0.15);
+            color: rgba(128, 128, 128, 0.25);
             font-size: 32px;
-            font-weight: bold;
             transform: rotate(-30deg);
             pointer-events: none;
             z-index: 999;
-        }
-
-        .wm-zj1 { top: 15%; left: 20%; }
-        .wm-zj2 { top: 35%; left: 50%; }
-        .wm-zj3 { top: 55%; left: 30%; }
-        .wm-zj4 { top: 75%; left: 65%; }
-        .wm-zj5 { top: 85%; left: 40%; }
-
-        .wm-tao1 { bottom: 10px; left: 10px; transform: none; font-size: 16px; color: rgba(0,0,0,0.6); }
-        .wm-tao2 { bottom: 10px; right: 10px; transform: none; font-size: 16px; color: rgba(0,0,0,0.6); }
+        }}
+        .bottom-left {{
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            color: black;
+            font-weight: bold;
+            background: white;
+            padding: 2px 6px;
+        }}
+        .bottom-right {{
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            color: black;
+            font-weight: bold;
+            background: white;
+            padding: 2px 6px;
+        }}
+        .controls {{
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: white;
+            padding: 10px;
+            z-index: 1000;
+            border-radius: 5px;
+        }}
+        select, input {{
+            margin: 5px 0;
+            width: 100%;
+        }}
     </style>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
 </head>
 <body>
-    <div id="map"></div>
+<div id="map"></div>
+<div class="controls">
+    <label>事故类型:</label>
+    <select id="typeFilter"><option value="">全部</option></select>
+    <label>事故等级:</label>
+    <select id="levelFilter"><option value="">全部</option></select>
+    <label>是否涉浙:</label>
+    <select id="zhejiangFilter"><option value="">全部</option></select>
+    <label>挂而未管或假光租:</label>
+    <select id="guangzhuFilter"><option value="">全部</option></select>
+    <label>代而不管:</label>
+    <select id="daierbuguanFilter"><option value="">全部</option></select>
+    <label>挂且有效或部分管理:</label>
+    <select id="youxiaoguanliFilter"><option value="">全部</option></select>
+    <label>三无运输船舶:</label>
+    <select id="sanwuFilter"><option value="">全部</option></select>
+    <label>关键字搜索（事故概要/事故时间/事故损失/船舶）:</label>
+    <input type="text" id="keywordInput" placeholder="请输入关键字..." />
+    <button onclick="applyFilters()">确认</button>
+</div>
+<div class="bottom-left">陶越 CCSC 15168318167</div>
+<div class="bottom-right">陶越 CCSC 15168318167</div>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const map = L.map('map').setView([30, 115], 5);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {{
+    attribution: '© OpenStreetMap contributors'
+}}).addTo(map);
 
-    <div class="watermark wm-zj1">浙江省港航管理中心</div>
-    <div class="watermark wm-zj2">浙江省港航管理中心</div>
-    <div class="watermark wm-zj3">浙江省港航管理中心</div>
-    <div class="watermark wm-zj4">浙江省港航管理中心</div>
-    <div class="watermark wm-zj5">浙江省港航管理中心</div>
+const watermarks = [
+    [150, 300], [400, 600], [800, 200], [1000, 500], [300, 900]
+];
+watermarks.forEach((pos, i) => {{
+    const wm = document.createElement("div");
+    wm.className = "watermark";
+    wm.style.top = `${pos[0]}px`;
+    wm.style.left = `${pos[1]}px`;
+    wm.textContent = "浙江省港航管理中心";
+    document.body.appendChild(wm);
+}});
 
-    <div class="watermark wm-tao1">陶越 CCSC 15168318167</div>
-    <div class="watermark wm-tao2">陶越 CCSC 15168318167</div>
+let markers = [];
+let allPoints = [];
 
-    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
-    <script>
-        const map = L.map('map').setView([39.05, 117.76], 7);  // 设置地图初始中心在天津港附近
+fetch('points_804_cleaned.json')
+    .then(res => res.json())
+    .then(data => {{
+        allPoints = data;
+        initFilters(data);
+        plotPoints(data);
+    }});
 
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '&copy; OpenStreetMap contributors'
-        }).addTo(map);
+function plotPoints(data) {{
+    markers.forEach(m => map.removeLayer(m));
+    markers = [];
 
-        fetch('points.json')
-            .then(res => res.json())
-            .then(data => {
-                data.forEach(item => {
-                    if (!item.lat || !item.lng) return;
-                    const marker = L.marker([item.lat, item.lng]).addTo(map);
-                    const popup = `
-                        <b>${item.title}</b><br/>
-                        船舶：${item.ship || "未知"}<br/>
-                        类型：${item.type || "未知"}<br/>
-                        涉及浙江：${item.zhejiang || "否"}<br/>
-                        ${item.summary || ""}
-                    `;
-                    marker.bindPopup(popup);
-                });
-            })
-            .catch(err => console.error('加载 points.json 出错', err));
-    </script>
+    data.forEach(point => {{
+        const marker = L.marker([point.lat, point.lng])
+            .addTo(map)
+            .bindPopup(`<b>${point.title}</b><br>${point.ship}<br>${point.summary}`);
+        markers.push(marker);
+    }});
+
+    const group = new L.featureGroup(markers);
+    if (markers.length > 0) {{
+        map.fitBounds(group.getBounds());
+    }}
+}}
+
+function initFilters(data) {{
+    const fields = [
+        ["type", "typeFilter"],
+        ["level", "levelFilter"],
+        ["zhejiang", "zhejiangFilter"],
+        ["guangzhu", "guangzhuFilter"],
+        ["daierbuguan", "daierbuguanFilter"],
+        ["youxiaoguanli", "youxiaoguanliFilter"],
+        ["sanwu", "sanwuFilter"]
+    ];
+    fields.forEach(([key, selectId]) => {{
+        const options = Array.from(new Set(data.map(p => p[key]).filter(v => v)));
+        const select = document.getElementById(selectId);
+        options.forEach(val => {{
+            const opt = document.createElement("option");
+            opt.value = val;
+            opt.textContent = val;
+            select.appendChild(opt);
+        }});
+    }});
+}}
+
+function applyFilters() {{
+    const filters = {{
+        type: document.getElementById("typeFilter").value,
+        level: document.getElementById("levelFilter").value,
+        zhejiang: document.getElementById("zhejiangFilter").value,
+        guangzhu: document.getElementById("guangzhuFilter").value,
+        daierbuguan: document.getElementById("daierbuguanFilter").value,
+        youxiaoguanli: document.getElementById("youxiaoguanliFilter").value,
+        sanwu: document.getElementById("sanwuFilter").value,
+        keyword: document.getElementById("keywordInput").value.trim()
+    }};
+    const filtered = allPoints.filter(p =>
+        (!filters.type || p.type === filters.type) &&
+        (!filters.level || p.level === filters.level) &&
+        (!filters.zhejiang || p.zhejiang === filters.zhejiang) &&
+        (!filters.guangzhu || p.guangzhu === filters.guangzhu) &&
+        (!filters.daierbuguan || p.daierbuguan === filters.daierbuguan) &&
+        (!filters.youxiaoguanli || p.youxiaoguanli === filters.youxiaoguanli) &&
+        (!filters.sanwu || p.sanwu === filters.sanwu) &&
+        (!filters.keyword || (
+            (p.summary && p.summary.includes(filters.keyword)) ||
+            (p.title && p.title.includes(filters.keyword)) ||
+            (p.loss && p.loss.includes(filters.keyword)) ||
+            (p.ship && p.ship.includes(filters.keyword))
+        ))
+    );
+    plotPoints(filtered);
+}}
+</script>
 </body>
 </html>

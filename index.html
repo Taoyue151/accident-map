@@ -1,0 +1,150 @@
+
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8" />
+    <title>事故地图</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link
+        rel="stylesheet"
+        href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    />
+    <style>
+        #map { height: 100vh; }
+        .watermark {
+            position: absolute;
+            color: rgba(0, 0, 0, 0.15);
+            font-size: 36px;
+            font-weight: bold;
+            transform: rotate(-20deg);
+            z-index: 999;
+            pointer-events: none;
+        }
+        .watermark1 { top: 10%; left: 10%; }
+        .watermark2 { top: 30%; left: 30%; }
+        .watermark3 { top: 50%; left: 50%; }
+        .watermark4 { top: 70%; left: 70%; }
+        .watermark5 { top: 20%; left: 70%; }
+        .signature-left { bottom: 10px; left: 10px; font-size: 14px; }
+        .signature-right { bottom: 10px; right: 10px; font-size: 14px; }
+        .search-bar {
+            position: absolute;
+            top: 10px;
+            left: 50px;
+            z-index: 1000;
+            background: white;
+            padding: 10px;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="watermark watermark1">浙江省港航管理中心</div>
+    <div class="watermark watermark2">浙江省港航管理中心</div>
+    <div class="watermark watermark3">浙江省港航管理中心</div>
+    <div class="watermark watermark4">浙江省港航管理中心</div>
+    <div class="watermark watermark5">浙江省港航管理中心</div>
+    <div class="watermark signature-left">陶越 CCSC 15168318167</div>
+    <div class="watermark signature-right">陶越 CCSC 15168318167</div>
+
+    <div class="search-bar">
+        <input type="text" id="keyword" placeholder="请输入关键词..." />
+        <button onclick="applyFilters()">确认</button>
+        <br/><br/>
+        <label>事故类型:</label>
+        <select id="typeFilter" onchange="applyFilters()">
+            <option value="">全部</option>
+        </select>
+        <label>事故等级:</label>
+        <select id="levelFilter" onchange="applyFilters()">
+            <option value="">全部</option>
+        </select>
+        <label>是否涉及浙江:</label>
+        <select id="zhejiangFilter" onchange="applyFilters()">
+            <option value="">全部</option>
+            <option value="Y">Y</option>
+        </select>
+    </div>
+
+    <div id="map"></div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+    <script>
+        const map = L.map("map").setView([29.5, 120.0], 6);
+        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
+
+        let markers = L.markerClusterGroup();
+        let allMarkers = [];
+
+        fetch("accident_points_804.json")
+            .then(res => res.json())
+            .then(data => {
+                allMarkers = data.features.map(f => {
+                    const prop = f.properties;
+                    const marker = L.marker([f.geometry.coordinates[1], f.geometry.coordinates[0]]);
+                    marker.bindPopup(
+                        `<b>事故时间:</b> ${prop["事故时间"]}<br/>
+                         <b>事故类型:</b> ${prop["事故类型"]}<br/>
+                         <b>事故等级:</b> ${prop["事故等级"]}<br/>
+                         <b>事故概要:</b> ${prop["事故概要"]}<br/>
+                         <b>事故损失:</b> ${prop["事故损失"]}<br/>
+                         <b>涉事船舶:</b> ${prop["涉事船舶及其归属情况"]}`
+                    );
+                    marker.feature = f; // 便于过滤
+                    return marker;
+                });
+
+                applyFilters();
+                populateDropdown(data.features);
+            });
+
+        function populateDropdown(features) {
+            const typeSet = new Set();
+            const levelSet = new Set();
+            features.forEach(f => {
+                typeSet.add(f.properties["事故类型"]);
+                levelSet.add(f.properties["事故等级"]);
+            });
+
+            for (let t of typeSet) {
+                const opt = document.createElement("option");
+                opt.value = t;
+                opt.text = t;
+                document.getElementById("typeFilter").appendChild(opt);
+            }
+
+            for (let l of levelSet) {
+                const opt = document.createElement("option");
+                opt.value = l;
+                opt.text = l;
+                document.getElementById("levelFilter").appendChild(opt);
+            }
+        }
+
+        function applyFilters() {
+            markers.clearLayers();
+            const keyword = document.getElementById("keyword").value.toLowerCase();
+            const typeVal = document.getElementById("typeFilter").value;
+            const levelVal = document.getElementById("levelFilter").value;
+            const zhejiangVal = document.getElementById("zhejiangFilter").value;
+
+            const filtered = allMarkers.filter(m => {
+                const p = m.feature.properties;
+                const matchKeyword = keyword === "" ||
+                    p["事故概要"].toLowerCase().includes(keyword) ||
+                    p["事故时间"].toLowerCase().includes(keyword) ||
+                    p["事故损失"].toLowerCase().includes(keyword) ||
+                    p["涉事船舶及其归属情况"].toLowerCase().includes(keyword);
+                const matchType = !typeVal || p["事故类型"] === typeVal;
+                const matchLevel = !levelVal || p["事故等级"] === levelVal;
+                const matchZJ = !zhejiangVal || p["是否涉及浙江航运企业或海上货物运输的个人"] === zhejiangVal;
+                return matchKeyword && matchType && matchLevel && matchZJ;
+            });
+
+            filtered.forEach(m => markers.addLayer(m));
+            map.addLayer(markers);
+        }
+    </script>
+</body>
+</html>

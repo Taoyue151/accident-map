@@ -1,0 +1,142 @@
+
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <title>事故地图</title>
+    <style>
+        html, body, #map { height: 100%; margin: 0; padding: 0; }
+        .watermark {
+            position: absolute;
+            color: rgba(150,150,150,0.3);
+            font-size: 48px;
+            font-weight: bold;
+            z-index: 999;
+            pointer-events: none;
+        }
+        .watermark1 { top: 20%; left: 30%; transform: rotate(-15deg); }
+        .watermark2 { top: 40%; left: 50%; transform: rotate(-15deg); }
+        .watermark3 { top: 60%; left: 20%; transform: rotate(-15deg); }
+        .watermark4 { top: 80%; left: 40%; transform: rotate(-15deg); }
+        .watermark5 { top: 70%; left: 70%; transform: rotate(-15deg); }
+        #controls {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            z-index: 1000;
+            background: white;
+            padding: 10px;
+            border-radius: 6px;
+            box-shadow: 0 0 5px rgba(0,0,0,0.3);
+            font-size: 14px;
+            max-height: 90%;
+            overflow-y: auto;
+        }
+    </style>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css" />
+</head>
+<body>
+    <div id="map"></div>
+
+    <div class="watermark watermark1">浙江省港航管理中心</div>
+    <div class="watermark watermark2">浙江省港航管理中心</div>
+    <div class="watermark watermark3">浙江省港航管理中心</div>
+    <div class="watermark watermark4">陶越 CCSC 15168318167</div>
+    <div class="watermark watermark5">陶越 CCSC 15168318167</div>
+
+    <div id="controls">
+        <input type="text" id="keyword" placeholder="关键词（概要/时间/损失/船舶）" />
+        <button onclick="applyFilters()">确认</button><br><br>
+        <label>事故类型:</label>
+        <select id="typeFilter"><option>全部</option></select><br>
+        <label>事故等级:</label>
+        <select id="levelFilter"><option>全部</option></select><br>
+        <label>是否浙江:</label>
+        <select id="zjFilter"><option>全部</option><option>是</option><option>否</option></select><br>
+        <label>挂而未管或假光租:</label>
+        <select id="guarFilter"><option>全部</option><option>是</option><option>否</option></select><br>
+        <label>代而不管:</label>
+        <select id="daiFilter"><option>全部</option><option>是</option><option>否</option></select><br>
+        <label>挂有效或部分管理:</label>
+        <select id="guaYouFilter"><option>全部</option><option>是</option><option>否</option></select><br>
+        <label>三无船舶:</label>
+        <select id="sanwuFilter"><option>全部</option><option>是</option><option>否</option></select><br>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"></script>
+    <script>
+        let map = L.map('map').setView([29.5, 121], 5);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+
+        let allMarkers = [];
+
+        function loadGeoJSON() {
+            fetch('points_final_797.json')
+                .then(res => res.json())
+                .then(data => {
+                    let types = new Set();
+                    let levels = new Set();
+
+                    data.features.forEach(f => {
+                        let coords = f.geometry.coordinates;
+                        let props = f.properties;
+
+                        types.add(props["事故类型"]);
+                        levels.add(props["事故等级"]);
+
+                        let marker = L.marker([coords[1], coords[0]]);
+                        marker.featureProps = props;
+                        marker.bindPopup(`<b>${props["事故时间"]}</b><br>${props["事故概要"] || ""}`);
+                        marker.addTo(map);
+                        allMarkers.push(marker);
+                    });
+
+                    types.forEach(t => {
+                        let opt = document.createElement("option");
+                        opt.textContent = t;
+                        document.getElementById("typeFilter").appendChild(opt);
+                    });
+                    levels.forEach(l => {
+                        let opt = document.createElement("option");
+                        opt.textContent = l;
+                        document.getElementById("levelFilter").appendChild(opt);
+                    });
+                });
+        }
+
+        function applyFilters() {
+            let kw = document.getElementById("keyword").value.trim();
+            let type = document.getElementById("typeFilter").value;
+            let level = document.getElementById("levelFilter").value;
+            let zj = document.getElementById("zjFilter").value;
+            let guar = document.getElementById("guarFilter").value;
+            let dai = document.getElementById("daiFilter").value;
+            let guaYou = document.getElementById("guaYouFilter").value;
+            let sanwu = document.getElementById("sanwuFilter").value;
+
+            allMarkers.forEach(m => {
+                let p = m.featureProps;
+                let show = true;
+
+                if (type !== "全部" && p["事故类型"] !== type) show = false;
+                if (level !== "全部" && p["事故等级"] !== level) show = false;
+                if (zj !== "全部" && p["是否浙江"] !== zj) show = false;
+                if (guar !== "全部" && p["挂而未管或假光租"] !== guar) show = false;
+                if (dai !== "全部" && p["代而不管"] !== dai) show = false;
+                if (guaYou !== "全部" && p["挂有效或部分管理"] !== guaYou) show = false;
+                if (sanwu !== "全部" && p["三无船舶"] !== sanwu) show = false;
+
+                if (kw && !JSON.stringify(p).includes(kw)) show = false;
+
+                if (show) {
+                    m.addTo(map);
+                } else {
+                    map.removeLayer(m);
+                }
+            });
+        }
+
+        loadGeoJSON();
+    </script>
+</body>
+</html>

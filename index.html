@@ -18,14 +18,12 @@
             z-index: 999;
         }
 
-        /* 浙江省港航管理中心的5个位置 */
         .wm-zj1 { top: 15%; left: 20%; }
         .wm-zj2 { top: 35%; left: 50%; }
         .wm-zj3 { top: 55%; left: 30%; }
         .wm-zj4 { top: 75%; left: 65%; }
         .wm-zj5 { top: 85%; left: 40%; }
 
-        /* 陶越信息：左下和右下角 */
         .wm-tao1 { bottom: 10px; left: 10px; transform: none; font-size: 16px; color: rgba(0,0,0,0.6); }
         .wm-tao2 { bottom: 10px; right: 10px; transform: none; font-size: 16px; color: rgba(0,0,0,0.6); }
     </style>
@@ -34,14 +32,12 @@
 <body>
     <div id="map"></div>
 
-    <!-- 浙江省港航管理中心水印 -->
     <div class="watermark wm-zj1">浙江省港航管理中心</div>
     <div class="watermark wm-zj2">浙江省港航管理中心</div>
     <div class="watermark wm-zj3">浙江省港航管理中心</div>
     <div class="watermark wm-zj4">浙江省港航管理中心</div>
     <div class="watermark wm-zj5">浙江省港航管理中心</div>
 
-    <!-- 陶越水印 -->
     <div class="watermark wm-tao1">陶越 CCSC 15168318167</div>
     <div class="watermark wm-tao2">陶越 CCSC 15168318167</div>
 
@@ -53,7 +49,7 @@
             attribution: '&copy; OpenStreetMap contributors'
         }).addTo(map);
 
-        fetch('data.json')
+        fetch('points.json')
             .then(res => res.json())
             .then(data => {
                 data.forEach(item => {
@@ -69,7 +65,7 @@
                     marker.bindPopup(popup);
                 });
             })
-            .catch(err => console.error('加载 data.json 出错', err));
+            .catch(err => console.error('加载 points.json 出错', err));
     </script>
 </body>
 </html>

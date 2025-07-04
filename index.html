@@ -1,109 +1,154 @@
 
 <!DOCTYPE html>
-<html lang="zh">
+<html>
 <head>
   <meta charset="utf-8" />
-  <title>事故地图</title>
+  <title>事故点位地图</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"></script>
   <style>
-    html, body, #map { height: 100%; margin: 0; }
+    html, body, #map {
+      height: 100%;
+      margin: 0;
+    }
     .watermark {
       position: absolute;
-      color: rgba(128,128,128,0.3);
-      font-size: 32px;
-      font-weight: bold;
+      color: rgba(150, 150, 150, 0.3);
+      font-size: 48px;
+      transform: rotate(-30deg);
+      z-index: 500;
       pointer-events: none;
-      z-index: 999;
     }
-    .controls {
+    .watermark1 { top: 10%; left: 20%; }
+    .watermark2 { top: 30%; left: 40%; }
+    .watermark3 { top: 50%; left: 60%; }
+    .watermark4 { top: 70%; left: 30%; }
+    .watermark5 { top: 85%; left: 55%; }
+    .corner1 { bottom: 5px; left: 10px; font-size: 18px; color: #555; }
+    .corner2 { bottom: 5px; right: 10px; font-size: 18px; color: #555; }
+    .filter-box {
       position: absolute;
       top: 10px;
-      left: 50px;
+      left: 80px;
       z-index: 1000;
       background: white;
       padding: 10px;
-      border-radius: 5px;
+      border-radius: 6px;
+      box-shadow: 0 0 8px rgba(0,0,0,0.2);
       font-size: 14px;
     }
+    .filter-box select, .filter-box input {
+      margin-bottom: 4px;
+      width: 100%;
+    }
   </style>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
-  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 </head>
 <body>
-<div class="controls">
-  <input type="text" id="keyword" placeholder="输入关键词"/>
-  <button onclick="filterByKeyword()">确认</button><br><br>
-  <label>事故类型:</label><select id="type" onchange="filterMap()"><option value="">全部</option><option value="其它事故">其它事故</option><option value="搁浅">搁浅</option><option value="机舱进水">机舱进水</option><option value="火灾、爆炸">火灾、爆炸</option><option value="碰撞">碰撞</option><option value="自沉事故">自沉事故</option><option value="触碰">触碰</option><option value="触礁">触礁</option><option value="风灾事故">风灾事故</option></select><br>
-  <label>事故等级:</label><select id="level" onchange="filterMap()"><option value="">全部</option><option value="/">/</option><option value="一般">一般</option><option value="一般 ">一般 </option><option value="大">大</option><option value="小">小</option><option value="较大">较大</option><option value="重大">重大</option><option value="非常严重">非常严重</option></select><br>
-  <label>是否浙江:</label><select id="zhejiang" onchange="filterMap()"><option value="">全部</option><option value="是">是</option><option value="否">否</option></select><br>
-  <label>挂而未管:</label><select id="guaguang" onchange="filterMap()"><option value="">全部</option><option value="是">是</option><option value="否">否</option></select><br>
-  <label>代而不管:</label><select id="daiguan" onchange="filterMap()"><option value="">全部</option><option value="是">是</option><option value="否">否</option></select><br>
-  <label>挂有效/部分管理:</label><select id="gua_youxiaoguanli" onchange="filterMap()"><option value="">全部</option><option value="是">是</option><option value="否">否</option></select><br>
-  <label>三无船舶:</label><select id="sanwu" onchange="filterMap()"><option value="">全部</option><option value="是">是</option><option value="否">否</option></select><br>
-</div>
 <div id="map"></div>
-<div class="watermark" style="top:10%;left:15%;">浙江省港航管理中心</div>
-<div class="watermark" style="top:30%;left:40%;">浙江省港航管理中心</div>
-<div class="watermark" style="top:50%;left:65%;">浙江省港航管理中心</div>
-<div class="watermark" style="top:70%;left:30%;">浙江省港航管理中心</div>
-<div class="watermark" style="top:80%;left:50%;">浙江省港航管理中心</div>
-<div class="watermark" style="bottom:5%;left:2%;">陶越 CCSC 15168318167</div>
-<div class="watermark" style="bottom:5%;right:2%;">陶越 CCSC 15168318167</div>
+
+<div class="watermark watermark1">浙江省港航管理中心</div>
+<div class="watermark watermark2">浙江省港航管理中心</div>
+<div class="watermark watermark3">浙江省港航管理中心</div>
+<div class="watermark watermark4">浙江省港航管理中心</div>
+<div class="watermark watermark5">浙江省港航管理中心</div>
+<div class="watermark corner1">陶越 CCSC 15168318167</div>
+<div class="watermark corner2">陶越 CCSC 15168318167</div>
+
+<div class="filter-box">
+  <input type="text" id="keyword" placeholder="输入关键词" />
+  <button onclick="applyFilters()">确认</button><br/>
+  <label>事故类型:</label><select id="typeFilter" onchange="applyFilters()"><option value="">全部</option></select>
+  <label>事故等级:</label><select id="levelFilter" onchange="applyFilters()"><option value="">全部</option></select>
+  <label>是否浙江:</label><select id="zhejiangFilter" onchange="applyFilters()"><option value="">全部</option></select>
+  <label>挂而未管:</label><select id="fake_rentFilter" onchange="applyFilters()"><option value="">全部</option></select>
+  <label>代而不管:</label><select id="proxyFilter" onchange="applyFilters()"><option value="">全部</option></select>
+  <label>挂有效/部分管理:</label><select id="partialFilter" onchange="applyFilters()"><option value="">全部</option></select>
+  <label>三无船舶:</label><select id="sanwuFilter" onchange="applyFilters()"><option value="">全部</option></select>
+</div>
+
 <script>
-  const map = L.map('map').setView([27.5, 115.8], 5);
+  let map = L.map('map').setView([29.5, 121], 4);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    maxZoom: 18
+    maxZoom: 18,
   }).addTo(map);
 
-  let points = [];
   let markers = [];
+  let allData = [];
 
-  fetch('points_804.json')
-    .then(res => res.json())
-    .then(data => {
-      points = data;
-      plotMarkers(points);
-    });
+  function loadData() {
+    fetch('points_839.json')
+      .then(response => response.json())
+      .then(data => {
+        allData = data;
+        populateDropdowns(data);
+        showPoints(data);
+      });
+  }
 
-  function plotMarkers(data) {
+  function showPoints(data) {
     markers.forEach(m => map.removeLayer(m));
-    markers = data.map(p => {
-      return L.marker([p.lat, p.lng]).addTo(map).bindPopup(
-        `<b>${p.title}</b><br>类型: ${p.type}<br>等级: ${p.level}<br>损失: ${p.loss}<br>船舶: ${p.ship}<br>${p.summary}`
-      );
+    markers = [];
+
+    data.forEach(d => {
+      const marker = L.marker([d.lat, d.lng])
+        .bindPopup(`<b>${d.title}</b><br>${d.summary}<br><i>${d.ship}</i>`);
+      markers.push(marker);
+      marker.addTo(map);
     });
   }
 
-  function filterMap() {
-    const t = document.getElementById("type").value;
-    const l = document.getElementById("level").value;
-    const z = document.getElementById("zhejiang").value;
-    const g = document.getElementById("guaguang").value;
-    const d = document.getElementById("daiguan").value;
-    const gy = document.getElementById("gua_youxiaoguanli").value;
-    const s = document.getElementById("sanwu").value;
+  function populateDropdowns(data) {
+    const categories = {
+      typeFilter: "type",
+      levelFilter: "level",
+      zhejiangFilter: "zhejiang",
+      fake_rentFilter: "fake_rent",
+      proxyFilter: "proxy",
+      partialFilter: "partial",
+      sanwuFilter: "sanwu"
+    };
 
-    const filtered = points.filter(p =>
-      (!t || p.type === t) &&
-      (!l || p.level === l) &&
-      (!z || p.zhejiang === z) &&
-      (!g || p.guaguang === g) &&
-      (!d || p.daiguan === d) &&
-      (!gy || p.gua_youxiaoguanli === gy) &&
-      (!s || p.sanwu === s)
-    );
-    plotMarkers(filtered);
+    for (const [selectId, key] of Object.entries(categories)) {
+      const select = document.getElementById(selectId);
+      const options = [...new Set(data.map(d => d[key]).filter(v => v))];
+      options.forEach(val => {
+        const opt = document.createElement("option");
+        opt.value = val;
+        opt.textContent = val;
+        select.appendChild(opt);
+      });
+    }
   }
 
-  function filterByKeyword() {
+  function applyFilters() {
     const kw = document.getElementById("keyword").value.trim();
-    if (!kw) return plotMarkers(points);
-    const filtered = points.filter(p =>
-      p.title.includes(kw) || p.loss.includes(kw) ||
-      p.ship.includes(kw) || p.summary.includes(kw)
+    const type = document.getElementById("typeFilter").value;
+    const level = document.getElementById("levelFilter").value;
+    const zhejiang = document.getElementById("zhejiangFilter").value;
+    const fake = document.getElementById("fake_rentFilter").value;
+    const proxy = document.getElementById("proxyFilter").value;
+    const partial = document.getElementById("partialFilter").value;
+    const sanwu = document.getElementById("sanwuFilter").value;
+
+    const filtered = allData.filter(d =>
+      (!type || d.type === type) &&
+      (!level || d.level === level) &&
+      (!zhejiang || d.zhejiang === zhejiang) &&
+      (!fake || d.fake_rent === fake) &&
+      (!proxy || d.proxy === proxy) &&
+      (!partial || d.partial === partial) &&
+      (!sanwu || d.sanwu === sanwu) &&
+      (
+        !kw || d.summary.includes(kw) || d.title.includes(kw) ||
+        d.damage.includes(kw) || d.ship.includes(kw)
+      )
     );
-    plotMarkers(filtered);
+
+    showPoints(filtered);
   }
+
+  loadData();
 </script>
 </body>
 </html>

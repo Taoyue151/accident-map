@@ -1,0 +1,148 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>事故地图</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    html, body, #map {{ height: 100%; margin: 0; padding: 0; }}
+    .search-container {{
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      background: white;
+      padding: 10px;
+      z-index: 1000;
+      font-size: 14px;
+      border-radius: 6px;
+      box-shadow: 0 0 5px rgba(0,0,0,0.3);
+    }}
+    .watermark {{
+      position: absolute;
+      font-size: 50px;
+      color: rgba(0,0,0,0.1);
+      transform: rotate(-30deg);
+      z-index: 0;
+    }}
+  </style>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+</head>
+<body>
+<div class="search-container">
+  <input type="text" id="keyword" placeholder="关键词（概要/时间/损失/船舶）">
+  <button onclick="applyFilters()">确认</button><br>
+  事故类型: <select id="typeFilter" onchange="applyFilters()">
+    <option value="全部">全部</option>
+  </select><br>
+  事故等级: <select id="levelFilter" onchange="applyFilters()">
+    <option value="全部">全部</option>
+  </select><br>
+  是否浙江: <select id="zhejiangFilter" onchange="applyFilters()">
+    <option value="全部">全部</option>
+    <option value="是">是</option>
+    <option value="否">否</option>
+  </select><br>
+  挂而未管或假光租: <select id="fakeFilter" onchange="applyFilters()">
+    <option value="全部">全部</option>
+    <option value="是">是</option>
+    <option value="否">否</option>
+  </select><br>
+  代而不管: <select id="proxyFilter" onchange="applyFilters()">
+    <option value="全部">全部</option>
+    <option value="是">是</option>
+    <option value="否">否</option>
+  </select><br>
+  挂有效或部分管理: <select id="partialFilter" onchange="applyFilters()">
+    <option value="全部">全部</option>
+    <option value="是">是</option>
+    <option value="否">否</option>
+  </select><br>
+  三无船舶: <select id="illegalFilter" onchange="applyFilters()">
+    <option value="全部">全部</option>
+    <option value="是">是</option>
+    <option value="否">否</option>
+  </select>
+</div>
+
+<div id="map"></div>
+
+<script>
+let map = L.map('map').setView([27, 112], 6);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {{
+  maxZoom: 18,
+}}).addTo(map);
+
+let markers = L.markerClusterGroup();
+let allMarkers = [];
+
+fetch('accidents_797.json')
+  .then(response => response.json())
+  .then(data => {{
+    data.features.forEach(feature => {{
+      let props = feature.properties;
+      let marker = L.marker([feature.geometry.coordinates[1], feature.geometry.coordinates[0]]);
+      marker.bindPopup(`<b>${{props["事故时间"]}}</b><br>${{props["事故概要"]}}<br>${{props["事故损失"]}}<br>${{props["涉事船舶及其归属情况"]}}`);
+      marker.feature = feature;
+      markers.addLayer(marker);
+      allMarkers.push(marker);
+    }});
+    map.addLayer(markers);
+    populateSelectOptions(allMarkers);
+  }});
+
+function applyFilters() {{
+  let keyword = document.getElementById("keyword").value.trim();
+  let type = document.getElementById("typeFilter").value;
+  let level = document.getElementById("levelFilter").value;
+  let zhejiang = document.getElementById("zhejiangFilter").value;
+  let fake = document.getElementById("fakeFilter").value;
+  let proxy = document.getElementById("proxyFilter").value;
+  let partial = document.getElementById("partialFilter").value;
+  let illegal = document.getElementById("illegalFilter").value;
+
+  markers.clearLayers();
+  allMarkers.forEach(marker => {{
+    let props = marker.feature.properties;
+    let match = true;
+
+    if (keyword && !(
+      props["事故概要"].includes(keyword) ||
+      props["事故时间"].includes(keyword) ||
+      props["事故损失"].includes(keyword) ||
+      props["涉事船舶及其归属情况"].includes(keyword))) {{
+      match = false;
+    }}
+    if (type !== "全部" && props["事故类型"] !== type) match = false;
+    if (level !== "全部" && props["事故等级"] !== level) match = false;
+    if (zhejiang !== "全部" && props["是否浙江"] !== zhejiang) match = false;
+    if (fake !== "全部" && props["挂而未管或假光租"] !== fake) match = false;
+    if (proxy !== "全部" && props["代而不管"] !== proxy) match = false;
+    if (partial !== "全部" && props["挂有效或部分管理"] !== partial) match = false;
+    if (illegal !== "全部" && props["三无船舶"] !== illegal) match = false;
+
+    if (match) markers.addLayer(marker);
+  }});
+}}
+
+function populateSelectOptions(markers) {{
+  let typeSet = new Set();
+  let levelSet = new Set();
+  markers.forEach(marker => {{
+    let props = marker.feature.properties;
+    typeSet.add(props["事故类型"]);
+    levelSet.add(props["事故等级"]);
+  }});
+  for (let val of [...typeSet].sort()) {{
+    document.getElementById("typeFilter").innerHTML += `<option value="${{val}}">${{val}}</option>`;
+  }}
+  for (let val of [...levelSet].sort()) {{
+    document.getElementById("levelFilter").innerHTML += `<option value="${{val}}">${{val}}</option>`;
+  }}
+}}
+</script>
+</body>
+</html>

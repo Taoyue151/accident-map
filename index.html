@@ -2,133 +2,74 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <meta charset="utf-8" />
-  <title>事故地图展示</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <link
-    rel="stylesheet"
-    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-  />
-  <link
-    rel="stylesheet"
-    href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css"
-  />
-  <link
-    rel="stylesheet"
-    href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css"
-  />
-  <style>
-    #map { height: 100vh; }
-    .watermark {
-      position: absolute;
-      color: rgba(0,0,0,0.1);
-      font-size: 28px;
-      font-weight: bold;
-      pointer-events: none;
-      z-index: 999;
-    }
-    .watermark1 { top: 20%; left: 10%; transform: rotate(-20deg); }
-    .watermark2 { top: 50%; left: 40%; transform: rotate(-10deg); }
-    .watermark3 { top: 80%; left: 70%; transform: rotate(-30deg); }
-    .watermark4 { bottom: 5px; left: 10px; font-size: 14px; color: rgba(0,0,0,0.3); }
-    .watermark5 { bottom: 5px; right: 10px; font-size: 14px; color: rgba(0,0,0,0.3); }
-    .filter-box {
-      position: absolute;
-      z-index: 1000;
-      background: white;
-      padding: 10px;
-      top: 10px;
-      right: 10px;
-      box-shadow: 0 0 5px rgba(0,0,0,0.3);
-      font-size: 14px;
-    }
-  </style>
+    <meta charset="utf-8" />
+    <title>事故点位地图</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        html, body, #map { height: 100%; margin: 0; padding: 0; }
+
+        .watermark {
+            position: absolute;
+            color: rgba(0, 0, 0, 0.15);
+            font-size: 32px;
+            font-weight: bold;
+            transform: rotate(-30deg);
+            pointer-events: none;
+            z-index: 999;
+        }
+
+        /* 浙江省港航管理中心的5个位置 */
+        .wm-zj1 { top: 15%; left: 20%; }
+        .wm-zj2 { top: 35%; left: 50%; }
+        .wm-zj3 { top: 55%; left: 30%; }
+        .wm-zj4 { top: 75%; left: 65%; }
+        .wm-zj5 { top: 85%; left: 40%; }
+
+        /* 陶越信息：左下和右下角 */
+        .wm-tao1 { bottom: 10px; left: 10px; transform: none; font-size: 16px; color: rgba(0,0,0,0.6); }
+        .wm-tao2 { bottom: 10px; right: 10px; transform: none; font-size: 16px; color: rgba(0,0,0,0.6); }
+    </style>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
 </head>
 <body>
-  <div id="map"></div>
-  <div class="filter-box">
-    <div><strong>关键词检索</strong></div>
-    <input type="text" id="searchInput" placeholder="输入关键词后回车" style="width:100%;margin:5px 0" />
-    <div>
-      <label>挂而未管或假光租：</label>
-      <select id="filter1"><option value="">全部</option><option value="Y">Y</option></select>
-    </div>
-    <div>
-      <label>代而不管：</label>
-      <select id="filter2"><option value="">全部</option><option value="Y">Y</option></select>
-    </div>
-    <div>
-      <label>挂且有效或部分管理：</label>
-      <select id="filter3"><option value="">全部</option><option value="Y">Y</option></select>
-    </div>
-    <div>
-      <label>三无运输船舶：</label>
-      <select id="filter4"><option value="">全部</option><option value="Y">Y</option></select>
-    </div>
-  </div>
-  <div class="watermark watermark1">浙江省港航管理中心</div>
-  <div class="watermark watermark2">浙江省港航管理中心</div>
-  <div class="watermark watermark3">浙江省港航管理中心</div>
-  <div class="watermark watermark4">陶越 CCSC 15168318167</div>
-  <div class="watermark watermark5">陶越 CCSC 15168318167</div>
+    <div id="map"></div>
 
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
-  <script>
-    const map = L.map('map').setView([29.5, 121.5], 6);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '&copy; OpenStreetMap contributors'
-    }).addTo(map);
+    <!-- 浙江省港航管理中心水印 -->
+    <div class="watermark wm-zj1">浙江省港航管理中心</div>
+    <div class="watermark wm-zj2">浙江省港航管理中心</div>
+    <div class="watermark wm-zj3">浙江省港航管理中心</div>
+    <div class="watermark wm-zj4">浙江省港航管理中心</div>
+    <div class="watermark wm-zj5">浙江省港航管理中心</div>
 
-    const markers = L.markerClusterGroup();
-    let allData = [];
+    <!-- 陶越水印 -->
+    <div class="watermark wm-tao1">陶越 CCSC 15168318167</div>
+    <div class="watermark wm-tao2">陶越 CCSC 15168318167</div>
 
-    fetch('data.json')
-      .then(response => response.json())
-      .then(data => {
-        allData = data;
-        updateMarkers();
-      });
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <script>
+        const map = L.map('map').setView([29.5, 119.5], 5);
 
-    function updateMarkers() {
-      markers.clearLayers();
-      const keyword = document.getElementById('searchInput').value.trim().toLowerCase();
-      const f1 = document.getElementById('filter1').value;
-      const f2 = document.getElementById('filter2').value;
-      const f3 = document.getElementById('filter3').value;
-      const f4 = document.getElementById('filter4').value;
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; OpenStreetMap contributors'
+        }).addTo(map);
 
-      allData.forEach(d => {
-        if (
-          (keyword === '' || Object.values(d).some(v => (v || '').toString().toLowerCase().includes(keyword))) &&
-          (f1 === '' || d.flag_fake === f1) &&
-          (f2 === '' || d.proxy_ungoverned === f2) &&
-          (f3 === '' || d.flag_valid === f3) &&
-          (f4 === '' || d.three_no_vessel === f4)
-        ) {
-          const popup = `
-            <b>事故概要：</b>${d.summary || ''}<br/>
-            <b>事故时间：</b>${d.accident_time || ''}<br/>
-            <b>事故类型：</b>${d.accident_type || ''}<br/>
-            <b>事故等级：</b>${d.accident_level || ''}<br/>
-            <b>事故损失：</b>${d.accident_loss || ''}<br/>
-            <b>涉事船舶：</b>${d.vessel_info || ''}<br/>
-            <b>是否涉及浙江：</b>${d.is_zhejiang_related || ''}
-          `;
-          const marker = L.marker([d.lat, d.lng]).bindPopup(popup);
-          markers.addLayer(marker);
-        }
-      });
-      map.addLayer(markers);
-    }
-
-    document.getElementById('searchInput').addEventListener('keyup', e => {
-      if (e.key === 'Enter') updateMarkers();
-    });
-    document.getElementById('filter1').addEventListener('change', updateMarkers);
-    document.getElementById('filter2').addEventListener('change', updateMarkers);
-    document.getElementById('filter3').addEventListener('change', updateMarkers);
-    document.getElementById('filter4').addEventListener('change', updateMarkers);
-  </script>
+        fetch('data.json')
+            .then(res => res.json())
+            .then(data => {
+                data.forEach(item => {
+                    if (!item.lat || !item.lng) return;
+                    const marker = L.marker([item.lat, item.lng]).addTo(map);
+                    const popup = `
+                        <b>${item.title}</b><br/>
+                        船舶：${item.ship || "未知"}<br/>
+                        类型：${item.type || "未知"}<br/>
+                        涉及浙江：${item.zhejiang || "否"}<br/>
+                        ${item.summary || ""}
+                    `;
+                    marker.bindPopup(popup);
+                });
+            })
+            .catch(err => console.error('加载 data.json 出错', err));
+    </script>
 </body>
 </html>

@@ -1,0 +1,27 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          117.7653,
+          39.0483
+        ]
+      },
+      "properties": {
+        "序号": 1,
+        "事故概要": "某事故概要文字",
+        "事故等级": "一般事故",
+        "事故时间": "2015年03月14日",
+        "涉事船舶及其归属情况": "SPAR NEPTUN（海王星）轮",
+        "是否涉及浙江航运企业或海上货物运输的个人": null,
+        "挂而未管": null,
+        "代而不管": null,
+        "挂有效/部分管理": null,
+        "三无船舶": null
+      }
+    }
+  ]
+}

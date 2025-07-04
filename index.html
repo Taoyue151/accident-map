@@ -1,0 +1,129 @@
+
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>事故地图</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <style>
+        html, body, #map {{
+            height: 100%;
+            margin: 0;
+            padding: 0;
+        }}
+        #filter {{
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            z-index: 1000;
+            background: white;
+            padding: 10px;
+            border-radius: 8px;
+            box-shadow: 0 0 6px rgba(0,0,0,0.3);
+            max-height: 90%;
+            overflow-y: auto;
+            font-size: 14px;
+        }}
+        .watermark {{
+            position: absolute;
+            color: rgba(100, 100, 100, 0.3);
+            font-size: 24px;
+            pointer-events: none;
+        }}
+        .wm1 {{ bottom: 10px; left: 10px; }}
+        .wm2 {{ bottom: 10px; right: 10px; }}
+        .wm3 {{ top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 36px; }}
+        .wm4 {{ top: 10px; right: 10px; }}
+        .wm5 {{ top: 10px; left: 10px; }}
+    </style>
+</head>
+<body>
+<div id="map"></div>
+<div id="filter">
+    <input type="text" id="keyword" placeholder="关键词（概要/时间/损失/船舶）"><br>
+    <button onclick="applyFilters()">确认</button><br><br>
+    <label>事故类型:</label>
+    <select id="typeFilter"><option>全部</option></select><br>
+    <label>事故等级:</label>
+    <select id="levelFilter"><option>全部</option></select><br>
+    <label>是否浙江:</label>
+    <select id="zhejiangFilter"><option>全部</option><option>是</option><option>否</option></select><br>
+</div>
+<div class="watermark wm1">陶越 CCSC 15168318167</div>
+<div class="watermark wm2">陶越 CCSC 15168318167</div>
+<div class="watermark wm3">浙江省港航管理中心</div>
+<div class="watermark wm4">陶越 CCSC 15168318167</div>
+<div class="watermark wm5">陶越 CCSC 15168318167</div>
+
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<script>
+    const map = L.map('map').setView([29.5, 119.5], 5);
+    L.tileLayer('https://{{s}}.tile.openstreetmap.org/{{z}}/{{x}}/{{y}}.png', {{
+        maxZoom: 18,
+        attribution: '&copy; OpenStreetMap contributors'
+    }}).addTo(map);
+
+    let allMarkers = [];
+
+    fetch('points.json')
+        .then(response => response.json())
+        .then(data => {{
+            window.allData = data;
+            renderMarkers(data);
+            populateFilters(data);
+        }})
+        .catch(err => {{
+            alert("加载点位失败：" + err);
+        }});
+
+    function renderMarkers(data) {{
+        allMarkers.forEach(m => map.removeLayer(m));
+        allMarkers = [];
+
+        data.forEach(item => {{
+            const marker = L.marker([item.lat, item.lng])
+                .bindPopup(`<b>${{item["事故概要"]}}</b><br>时间: ${{item["事故时间"]}}<br>类型: ${{item["事故类型"]}}<br>死亡伤亡: ${{item["死亡或失踪"] || "无"}}`);
+            marker.addTo(map);
+            allMarkers.push(marker);
+        }});
+    }}
+
+    function populateFilters(data) {{
+        const typeSet = new Set();
+        const levelSet = new Set();
+        data.forEach(item => {{
+            typeSet.add(item["事故类型"]);
+            levelSet.add(item["事故等级"]);
+        }});
+        const typeFilter = document.getElementById("typeFilter");
+        const levelFilter = document.getElementById("levelFilter");
+        for (let v of typeSet) {{
+            let option = document.createElement("option");
+            option.textContent = v;
+            typeFilter.appendChild(option);
+        }}
+        for (let v of levelSet) {{
+            let option = document.createElement("option");
+            option.textContent = v;
+            levelFilter.appendChild(option);
+        }}
+    }}
+
+    function applyFilters() {{
+        const kw = document.getElementById("keyword").value.trim();
+        const typeF = document.getElementById("typeFilter").value;
+        const levelF = document.getElementById("levelFilter").value;
+        const zhejiangF = document.getElementById("zhejiangFilter").value;
+
+        const filtered = window.allData.filter(item => {{
+            return (kw === "" || JSON.stringify(item).includes(kw)) &&
+                   (typeF === "全部" || item["事故类型"] === typeF) &&
+                   (levelF === "全部" || item["事故等级"] === levelF) &&
+                   (zhejiangF === "全部" || ((item["是否涉及浙江航运企业或运输个人"] === "Y") === (zhejiangF === "是")));
+        }});
+        renderMarkers(filtered);
+    }}
+</script>
+</body>
+</html>
